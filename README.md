@@ -2,7 +2,7 @@
 
 Čest troubové 👋
 
-Protože vím, že o programování víte úplnou piču a akorát byste mi to rozbili, sepsal jsem vám návod krok za krokem. Čtěte to pomalu a nesnažte se u toho moc myslet, ať vás nerozbolí hlava.
+Protože vím, že o programování víte úplnou piču a akorát byste mi to rozbili, sepsal jsem vám návod krok za krokem. Čtěte to pomalu a nesnažte se u toho moc myslet, ať vám nejebne.
 
 ## Krok 1: Příprava vašeho kompu (to je ta věc s klávesnicí, kdybyste nahodou.. ne? ok dobre sorry.)
 
