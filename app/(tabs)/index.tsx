@@ -1,36 +1,39 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Button,
+  Dimensions,
   StyleSheet,
   Text,
-  View,
   TextInput,
-  Button,
-  Alert,
-  ActivityIndicator,
+  TouchableOpacity,
+  View
 } from "react-native";
 // Importujeme auth a db
-import { auth, db } from "../../firebaseConfig";
 import {
   createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
   onAuthStateChanged,
+  signInWithEmailAndPassword,
   signOut,
   User,
 } from "firebase/auth";
+import { auth, db } from "../../firebaseConfig"; // Zkontrolujte cestu k firebaseConfig
 
 // PŘIDÁNO: updateDoc a increment pro přičítání bodů
 import {
-  collection,
-  addDoc,
-  getDoc,
   doc,
-  setDoc,
-  updateDoc,
+  getDoc,
   increment,
+  setDoc,
+  updateDoc
 } from "firebase/firestore";
 import QRCode from "react-native-qrcode-svg";
 // PŘIDÁNO: Import kamery
 import { CameraView, useCameraPermissions } from "expo-camera";
+
+const { width } = Dimensions.get("window");
 
 export default function App() {
   const [email, setEmail] = useState("");
@@ -38,6 +41,10 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState<any>(null);
+
+  // PŘIDÁNO: Stavy pro animaci karty
+  const animatedValue = useRef(new Animated.Value(0)).current;
+  const [isFlipped, setIsFlipped] = useState(false);
 
   // PŘIDÁNO: Stavy pro kameru
   const [permission, requestPermission] = useCameraPermissions();
@@ -151,10 +158,43 @@ export default function App() {
     setUserData(null);
   };
 
+  // PŘIDÁNO: Funkce pro otočení karty
+  const flipCard = () => {
+    if (isFlipped) {
+      Animated.spring(animatedValue, {
+        toValue: 0,
+        friction: 8,
+        tension: 10,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.spring(animatedValue, {
+        toValue: 180,
+        friction: 8,
+        tension: 10,
+        useNativeDriver: true,
+      }).start();
+    }
+    setIsFlipped(!isFlipped);
+  };
+
+  // Interpolace hodnot pro rotaci
+  const frontInterpolate = animatedValue.interpolate({
+    inputRange: [0, 180],
+    outputRange: ["0deg", "180deg"],
+  });
+  const backInterpolate = animatedValue.interpolate({
+    inputRange: [0, 180],
+    outputRange: ["180deg", "360deg"],
+  });
+
+  const frontAnimatedStyle = { transform: [{ rotateY: frontInterpolate }] };
+  const backAnimatedStyle = { transform: [{ rotateY: backInterpolate }] };
+
   if (loading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color="#5D4037" />
       </View>
     );
   }
@@ -194,29 +234,59 @@ export default function App() {
           </View>
 
           <View style={{ marginTop: 20 }}>
-            <Button title="Odhlásit se" onPress={handleLogout} color="red" />
+            <Button title="Odhlásit se" onPress={handleLogout} color="#8D6E63" />
           </View>
         </View>
       );
     }
 
-    // CUSTOMER MODE
+    // CUSTOMER MODE - Věrnostní karta
     return (
       <View style={styles.container}>
         <Text style={styles.title}>Moje věrnostní karta</Text>
-        <View style={styles.pointsCard}>
-          <Text style={styles.pointsLabel}>Počet bodů:</Text>
-          <Text style={styles.pointsValue}>{userData?.points || 0} / 10</Text>
-        </View>
+        <Text style={styles.subtitle}>Klepni pro otočení na QR kód</Text>
 
-        <View style={styles.qrContainer}>
-          <QRCode value={user.uid} size={200} />
-          <Text style={{ marginTop: 10, color: "gray" }}>
-            Ukažte tento kód obsluze
-          </Text>
+        <TouchableOpacity onPress={flipCard} activeOpacity={1}>
+          <View>
+            {/* PŘEDNÍ STRANA - BODY */}
+            <Animated.View style={[styles.card, styles.cardFront, frontAnimatedStyle]}>
+              <Text style={styles.cardTitle}>Kavárna Doma ☕</Text>
+              
+              <View style={styles.gridContainer}>
+                {/* Vykreslení 10 políček pro razítka */}
+                {Array.from({ length: 10 }).map((_, index) => {
+                  const points = userData?.points || 0;
+                  const isCollected = index < points;
+                  return (
+                    <View key={index} style={[styles.stampBox, isCollected && styles.stampBoxFilled]}>
+                      {isCollected ? (
+                        <Text style={{fontSize: 20}}>☕</Text>
+                      ) : (
+                        <Text style={{color: '#A1887F', fontSize: 10}}>{index + 1}</Text>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+
+              <Text style={styles.pointsText}>{userData?.points || 0} / 10 bodů</Text>
+            </Animated.View>
+
+            {/* ZADNÍ STRANA - QR KÓD */}
+            <Animated.View style={[styles.card, styles.cardBack, backAnimatedStyle]}>
+              <Text style={styles.cardTitle}>Váš kód</Text>
+              <View style={styles.qrWrapper}>
+                <QRCode value={user.uid} size={150} color="#3E2723" backgroundColor="#ECE0D1" />
+              </View>
+              <Text style={styles.scanInstruction}>Ukažte obsluze pro přičtení bodu</Text>
+            </Animated.View>
+          </View>
+        </TouchableOpacity>
+
+        <View style={{ marginTop: 40, width: '80%' }}>
+          <Text style={{ textAlign: "center", marginBottom: 10, color: "#5D4037" }}>{user.email}</Text>
+          <Button title="Odhlásit se" onPress={handleLogout} color="#8D6E63" />
         </View>
-        <Text style={{ marginBottom: 20, marginTop: 20 }}>{user.email}</Text>
-        <Button title="Odhlásit se" onPress={handleLogout} color="red" />
       </View>
     );
   }
@@ -252,38 +322,53 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#F5F5DC", 
     alignItems: "center",
     justifyContent: "center",
     padding: 20,
   },
-  title: { fontSize: 24, fontWeight: "bold", marginBottom: 20 },
+  title: { 
+    fontSize: 24, 
+    fontWeight: "bold", 
+    marginBottom: 20,
+    color: "#3E2723" 
+  },
   input: {
     width: "100%",
     height: 50,
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: "#8D6E63", 
+    backgroundColor: "#FFF8E1", 
     borderRadius: 8,
     padding: 10,
     marginBottom: 15,
   },
   buttonContainer: { width: "100%", marginBottom: 10 },
   pointsCard: {
-    backgroundColor: "#f0f0f0",
+    backgroundColor: "#D7CCC8", 
     padding: 20,
     borderRadius: 10,
     width: "100%",
     alignItems: "center",
     marginBottom: 30,
+    borderWidth: 1,
+    borderColor: "#A1887F",
   },
-  pointsLabel: { fontSize: 18, color: "#555" },
-  pointsValue: { fontSize: 40, fontWeight: "bold", color: "#6200ea" },
+  pointsLabel: { fontSize: 18, color: "#4E342E" }, 
+  pointsValue: { fontSize: 40, fontWeight: "bold", color: "#3E2723" },
   qrContainer: {
     alignItems: "center",
     padding: 20,
     borderWidth: 1,
-    borderColor: "#eee",
+    borderColor: "#8D6E63",
     borderRadius: 10,
+    backgroundColor: "#FFF8E1",
+  },
+  subtitle: {
+    fontSize: 16,
+    color: "#6D4C41",
+    marginBottom: 20,
+    textAlign: "center",
   },
 
   // styly pro kameru
@@ -295,11 +380,87 @@ const styles = StyleSheet.create({
     backgroundColor: "#000",
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#8D6E63",
   },
   scanAgainButton: {
     position: "absolute",
-    backgroundColor: "white",
-    padding: 5,
+    backgroundColor: "#F5F5DC",
+    padding: 10,
     borderRadius: 5,
+    borderWidth: 1,
+    borderColor: "#8D6E63",
+  },
+
+  // styly pro věrnostní kartu
+  card: {
+    width: width * 0.8,
+    borderRadius: 10,
+    overflow: "hidden",
+    backfaceVisibility: "hidden",
+    position: "relative",
+  },
+  cardFront: {
+    backgroundColor: "#FFF",
+    padding: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#8D6E63",
+  },
+  cardBack: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "#FFF",
+    padding: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#8D6E63",
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 10,
+    textAlign: "center",
+    color: "#3E2723",
+  },
+  qrWrapper: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 10,
+  },
+  scanInstruction: {
+    fontSize: 14,
+    color: "#6D4C41",
+    textAlign: "center",
+  },
+  gridContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    marginBottom: 10,
+  },
+  stampBox: {
+    width: 30,
+    height: 30,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: "#8D6E63",
+    backgroundColor: "#D7CCC8",
+    justifyContent: "center",
+    alignItems: "center",
+    margin: 2,
+  },
+  stampBoxFilled: {
+    backgroundColor: "#A1887F",
+  },
+  pointsText: {
+    fontSize: 16,
+    color: "#3E2723",
+    textAlign: "center",
   },
 });
