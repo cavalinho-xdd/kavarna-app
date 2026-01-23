@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert, // ADDED
+  Alert, 
   StyleSheet,
   Text,
   TextInput,
