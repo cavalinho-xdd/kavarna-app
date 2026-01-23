@@ -1,50 +1,66 @@
-# Welcome to your Expo app 👋
+# ☕ Kavárna Doma aplikace
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Čest troubové 👋
 
-## Get started
+Protože vím, že o programování víte úplnou piču a akorát byste mi to rozbili, sepsal jsem vám návod krok za krokem. Čtěte to pomalu a nesnažte se u toho moc myslet, ať vám nejebne.
 
-1. Install dependencies
+## Krok 1: Příprava vašeho kompu (to je ta věc s klávesnicí, kdybyste nahodou.. ne? ok dobre sorry.)
 
-   ```bash
-   npm install
-   ```
+Než začnete machrovat s aplikací, musíte si nainstalovat nástroje. Bez nich to nepojede.
 
-2. Start the app
+1.  **Node.js** (To je motor, co to celé pohání)
+    * Jděte na [nodejs.org](https://nodejs.org/).
+    * Stáhněte tu verzi, kde je napsáno **LTS** (Recommended for most users).
+    * Nainstalujte to. Prostě klikejte *Next, Next, Next, Install, Finish*. Nic neměňte.
+    * STAHUJE TO PŘES OFICIALNI WINDOWS (nebo v míšově případě MACOS) SETUP WIZARD
+    
 
-   ```bash
-   npx expo start
-   ```
+2.  **Git** (Aby se vám stáhly soubory)
+    * Stáhněte a nainstalujte [Git](https://git-scm.com/downloads).
+    * Zase jen klikejte *Next* dokud to nezmizí.
 
-In the output, you'll find options to open the app in a
+## Krok 2: Příprava vašeho telefonu
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+Abyste tu apku viděli, potřebujete na mobilu speciální prohlížeč.
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+* **iPhone:** Stáhněte si **Expo Go** z [App Store](https://apps.apple.com/us/app/expo-go/id982107779).
+* **Android:** Stáhněte si **Expo Go** z [Google Play](https://play.google.com/store/apps/details?id=host.exp.exponent).
 
-## Get a fresh project
+⚠️ **DŮLEŽITÉ:** Mobil i počítač musí být připojené na **stejné Wi-Fi**! Jinak to nepojede a budete mi volat, že to nefunguje.
 
-When you're ready, run:
+## Krok 3: Jak to rozjet na počítači
 
-```bash
-npm run reset-project
-```
+1.  Otevřete si **Terminál** (nebo Příkazový řádek / PowerShell).
+2.  Dostaňte se do složky s tímhle projektem (jestli nevíte jak, použijte chata trotlové).
+3.  Napište tento příkaz a dejte Enter (to stahuje půlku internetu, chvíli to potrvá):
+    ```bash
+    npm install
+    ```
+4.  Až to doběhne, spusťte aplikaci tímhle příkazem:
+    ```bash
+    npx expo start --clear
+    ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Krok 4: Jak to dostat do mobilu
 
-## Learn more
+Jakmile na počítači naskočí v terminálu velký **QR kód**:
 
-To learn more about developing your project with Expo, look at the following resources:
+* **iPhone:** Otevři normální foťák a namiř na QR kód. Klikni na žlutý odkaz.
+* **Android:** Otevři apku *Expo Go*, klikni na "Scan QR code" a namiř na monitor.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+A je to. Aplikace běží. Zkuste na nic nešahat, ať to nerozbijete.
 
-## Join the community
+---
 
-Join our community of developers creating universal apps.
+## 👑 Chcete práva "Barista" (Admin)?
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Pokud chcete v aplikaci skenovat kódy a přidávat body:
+
+1.  Zaregistrujte se v aplikaci svým emailem.
+2.  Napište zprávu **Džejkobovi the Greatest**.
+3.  Požádejte ho o přidělení role *Admin*.
+
+> **Proč si to nemůžete zapnout sami?**
+> Protože vám nevěřím a vím, že byste mi tu databázi okamžitě dojebali. xddd
+
+Děkuji za pochopení.
