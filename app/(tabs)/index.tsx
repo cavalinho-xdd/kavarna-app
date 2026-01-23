@@ -8,7 +8,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-// Importujeme auth a db
 import {
   createUserWithEmailAndPassword,
   deleteUser,
@@ -20,7 +19,6 @@ import {
 } from "firebase/auth";
 import { auth, db } from "../../firebaseConfig";
 
-// PŘIDÁNO: updateDoc a increment pro přičítání bodů
 import {
   deleteDoc,
   doc,
@@ -30,9 +28,7 @@ import {
   setDoc,
   updateDoc,
 } from "firebase/firestore";
-// PŘIDÁNO: Import kamery
 import { CameraView, useCameraPermissions } from "expo-camera";
-// Import věrnostní karty
 import { LoyaltyCard } from "../../components/loyalty-card";
 
 export default function App() {
@@ -44,7 +40,6 @@ export default function App() {
   const [lastPointAdded, setLastPointAdded] = useState<number>(0);
   const previousPoints = React.useRef<number>(0);
 
-  // PŘIDÁNO: Stavy pro kameru
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const processingScan = React.useRef(false);
@@ -57,7 +52,6 @@ export default function App() {
     return unsubscribe;
   }, []);
 
-  // Realtime posluchač pro data uživatele
   useEffect(() => {
     if (!user) {
       setUserData(null);
@@ -71,7 +65,6 @@ export default function App() {
         const data = docSnap.data();
         const newPoints = data.points || 0;
 
-        // Detekce přidání bodu
         if (newPoints > previousPoints.current && previousPoints.current > 0) {
           setLastPointAdded(Date.now());
         }
@@ -84,16 +77,14 @@ export default function App() {
     return () => unsubscribe();
   }, [user]);
 
-  // PŘIDÁNO: Funkce, co se stane po naskenování
   const handleBarCodeScanned = async ({ data }: { data: string }) => {
-    if (processingScan.current || scanned) return; // Zabráníme vícenásobnému načtení
+    if (processingScan.current || scanned) return; 
     processingScan.current = true;
     setScanned(true);
 
     try {
       const customerRef = doc(db, "users", data);
 
-      // Ověříme, že uživatel existuje
       const docSnap = await getDoc(customerRef);
       if (!docSnap.exists()) {
         Alert.alert("Chyba", "Neplatný kód uživatele.", [
@@ -108,7 +99,6 @@ export default function App() {
         return;
       }
 
-      // Přičteme bod
       await updateDoc(customerRef, {
         points: increment(1),
       });
@@ -144,7 +134,6 @@ export default function App() {
       );
       const user = userCredential.user;
 
-      // Odeslání ověřovacího emailu
       await sendEmailVerification(user);
 
       await setDoc(doc(db, "users", user.uid), {
@@ -152,7 +141,7 @@ export default function App() {
         createdAt: new Date(),
         points: 0,
         role: "customer",
-        isEmailVerified: false, // Výchozí stav
+        isEmailVerified: false,
       });
       Alert.alert(
         "Ověření emailu",
@@ -191,10 +180,8 @@ export default function App() {
           onPress: async () => {
             if (!user) return;
             try {
-              // 1. Smazání dat z Firestore
               await deleteDoc(doc(db, "users", user.uid));
 
-              // 2. Smazání uživatele z Auth
               await deleteUser(user);
 
               Alert.alert("Účet smazán", "Váš účet byl úspěšně vymazán.");
@@ -227,11 +214,6 @@ export default function App() {
 
   // --- 1. POKUD JE UŽIVATEL PŘIHLÁŠENÝ ---
   if (user) {
-    // KONTROLA OVĚŘENÍ EMAILU
-    // Ověřeno pokud:
-    // A) Firebase Auth říká OK (kliknutí na link)
-    // B) Firestore má isEmailVerified: true (manuální override)
-    // C) Speciální email "franta@test.cz" (hardcoded bypass)
     const isVerified =
       user.emailVerified ||
       userData?.isEmailVerified === true ||
@@ -259,13 +241,11 @@ export default function App() {
               if (auth.currentUser) {
                 await auth.currentUser.reload();
                 if (auth.currentUser.emailVerified) {
-                  // Synchronizace s databází - zapíšeme, že je ověřeno
                   const userRef = doc(db, "users", auth.currentUser.uid);
                   await updateDoc(userRef, {
                     isEmailVerified: true,
                   });
 
-                  // Force update state
                   setUser({ ...auth.currentUser });
                   Alert.alert("Super!", "Email byl úspěšně ověřen.");
                 } else {
@@ -308,7 +288,6 @@ export default function App() {
 
     // BARISTA MODE
     if (userData?.role === "admin") {
-      // Kontrola povolení kamery
       if (!permission) return <View />;
       if (!permission.granted) {
         return (
@@ -415,7 +394,7 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FAF6F3", // Krémové pozadí
+    backgroundColor: "#FAF6F3", 
     alignItems: "center",
     justifyContent: "center",
     padding: 24,
@@ -423,7 +402,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: "bold",
-    color: "#4A3728", // Kávově hnědá
+    color: "#4A3728",
     marginBottom: 32,
     textAlign: "center",
   },
@@ -509,7 +488,6 @@ const styles = StyleSheet.create({
     textDecorationLine: "underline",
   },
 
-  // styly pro kameru
   cameraContainer: {
     width: 280,
     height: 280,
