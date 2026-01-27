@@ -1,14 +1,6 @@
 import React, { useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert, // ADDED
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
-// Importujeme auth a db
+import { ActivityIndicator, Alert, StyleSheet, View } from "react-native";
+// Import auth a db
 import {
   createUserWithEmailAndPassword,
   deleteUser,
@@ -20,7 +12,7 @@ import {
 } from "firebase/auth";
 import { auth, db } from "../../firebaseConfig";
 
-// PŘIDÁNO: updateDoc a increment pro přičítání bodů
+// Firestore
 import {
   deleteDoc,
   doc,
@@ -30,10 +22,14 @@ import {
   setDoc,
   updateDoc,
 } from "firebase/firestore";
-// PŘIDÁNO: Import kamery
-import { CameraView, useCameraPermissions } from "expo-camera";
-// Import věrnostní karty
-import { LoyaltyCard } from "../../components/loyalty-card";
+// Kamera
+import { useCameraPermissions } from "expo-camera";
+
+// Naše nové komponenty
+import { AuthScreen } from "../../components/auth-screen";
+import { VerificationScreen } from "../../components/verification-screen";
+import { BaristaScreen } from "../../components/barista-screen";
+import { CustomerScreen } from "../../components/customer-screen";
 
 export default function App() {
   const [email, setEmail] = useState("");
@@ -44,7 +40,7 @@ export default function App() {
   const [lastPointAdded, setLastPointAdded] = useState<number>(0);
   const previousPoints = React.useRef<number>(0);
 
-  // PŘIDÁNO: Stavy pro kameru
+  // Stavy pro kameru
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const processingScan = React.useRef(false);
@@ -84,9 +80,9 @@ export default function App() {
     return () => unsubscribe();
   }, [user]);
 
-  // PŘIDÁNO: Funkce, co se stane po naskenování
+  // Handler: Barista naskenuje kód
   const handleBarCodeScanned = async ({ data }: { data: string }) => {
-    if (processingScan.current || scanned) return; // Zabráníme vícenásobnému načtení
+    if (processingScan.current || scanned) return;
     processingScan.current = true;
     setScanned(true);
 
@@ -142,21 +138,21 @@ export default function App() {
         email,
         password,
       );
-      const user = userCredential.user;
+      const newUser = userCredential.user;
 
       // Odeslání ověřovacího emailu
-      await sendEmailVerification(user);
+      await sendEmailVerification(newUser);
 
-      await setDoc(doc(db, "users", user.uid), {
-        email: user.email,
+      await setDoc(doc(db, "users", newUser.uid), {
+        email: newUser.email,
         createdAt: new Date(),
         points: 0,
         role: "customer",
-        isEmailVerified: false, // Výchozí stav
+        isEmailVerified: false,
       });
       Alert.alert(
         "Ověření emailu",
-        "Účet byl vytvořen. Na váš email jsme poslali ověřovací odkaz. Pro aktivaci účtu na něj prosím klikněte.",
+        "Účet byl vytvořen. Na váš email jsme poslali ověřovací odkaz.",
       );
     } catch (error) {
       Alert.alert("Chyba registrace", (error as any).message);
@@ -174,41 +170,66 @@ export default function App() {
   const handleLogout = async () => {
     await signOut(auth);
     setUserData(null);
+    setEmail("");
+    setPassword("");
+  };
+
+  // Handler: Ověření emailu (refresh)
+  const handleCheckVerification = async () => {
+    if (auth.currentUser) {
+      await auth.currentUser.reload();
+      if (auth.currentUser.emailVerified) {
+        const userRef = doc(db, "users", auth.currentUser.uid);
+        await updateDoc(userRef, {
+          isEmailVerified: true,
+        });
+        // Force update state
+        setUser({ ...auth.currentUser });
+        Alert.alert("Super!", "Email byl úspěšně ověřen.");
+      } else {
+        Alert.alert(
+          "Stále neověřeno",
+          "Zatím neevidujeme ověření. Zkuste to za chvíli znovu.",
+        );
+      }
+    }
+  };
+
+  // Handler: Znovuposlání emailu
+  const handleResendEmail = async () => {
+    try {
+      if (auth.currentUser) {
+        await sendEmailVerification(auth.currentUser);
+        Alert.alert("Odesláno", "Nový ověřovací email byl odeslán.");
+      }
+    } catch (e: any) {
+      Alert.alert("Chyba", "Příliš brzy na další email. Zkuste to později.");
+    }
   };
 
   const handleDeleteAccount = async () => {
     Alert.alert(
       "Smazat účet?",
-      "Tato akce je nevratná. Přijdete o všechny nasbírané body a váš účet bude trvale odstraněn.",
+      "Tato akce je nevratná. Přijdete o všechny nasbírané body.",
       [
-        {
-          text: "Zrušit",
-          style: "cancel",
-        },
+        { text: "Zrušit", style: "cancel" },
         {
           text: "Smazat účet",
           style: "destructive",
           onPress: async () => {
             if (!user) return;
             try {
-              // 1. Smazání dat z Firestore
               await deleteDoc(doc(db, "users", user.uid));
-
-              // 2. Smazání uživatele z Auth
               await deleteUser(user);
-
               Alert.alert("Účet smazán", "Váš účet byl úspěšně vymazán.");
             } catch (error: any) {
               if (error.code === "auth/requires-recent-login") {
                 Alert.alert(
                   "Bezpečnostní chyba",
-                  "Pro smazání účtu se musíte znovu přihlásit (z bezpečnostních důvodů).",
+                  "Pro smazání účtu se musíte znovu přihlásit.",
                 );
               } else {
-                Alert.alert(
-                  "Chyba",
-                  "Nepodařilo se smazat účet: " + error.message,
-                );
+                Alert.alert("Chyba", error.message);
               }
             }
           },
@@ -227,299 +248,67 @@ export default function App() {
 
   // --- 1. POKUD JE UŽIVATEL PŘIHLÁŠENÝ ---
   if (user) {
-    // KONTROLA OVĚŘENÍ EMAILU
-    // Ověřeno pokud:
-    // A) Firebase Auth říká OK (kliknutí na link)
-    // B) Firestore má isEmailVerified: true (manuální override)
-    // C) Speciální email "franta@test.cz" (hardcoded bypass)
     const isVerified =
       user.emailVerified ||
       userData?.isEmailVerified === true ||
       user.email === "franta@test.cz";
 
+    // A) Neověřený email
     if (!isVerified) {
       return (
-        <View style={styles.container}>
-          <Text style={styles.title}>Ověřte svůj email ✉️</Text>
-          <Text style={styles.subtitle}>
-            Poslali jsme potvrzovací odkaz na adresu:
-          </Text>
-          <Text
-            style={[styles.subtitle, { fontWeight: "bold", color: "#4A3728" }]}
-          >
-            {user.email}
-          </Text>
-          <Text style={styles.subtitle}>
-            Pro používání věrnostní karty prosím potvrďte svou emailovou adresu.
-          </Text>
-
-          <TouchableOpacity
-            style={styles.buttonPrimary}
-            onPress={async () => {
-              if (auth.currentUser) {
-                await auth.currentUser.reload();
-                if (auth.currentUser.emailVerified) {
-                  // Synchronizace s databází - zapíšeme, že je ověřeno
-                  const userRef = doc(db, "users", auth.currentUser.uid);
-                  await updateDoc(userRef, {
-                    isEmailVerified: true,
-                  });
-
-                  // Force update state
-                  setUser({ ...auth.currentUser });
-                  Alert.alert("Super!", "Email byl úspěšně ověřen.");
-                } else {
-                  Alert.alert(
-                    "Stále neověřeno",
-                    "Zatím neevidujeme ověření. Zkuste to za chvíli znovu.",
-                  );
-                }
-              }
-            }}
-          >
-            <Text style={styles.buttonPrimaryText}>Mám ověřeno (Obnovit)</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.buttonSecondary}
-            onPress={async () => {
-              try {
-                if (auth.currentUser) {
-                  await sendEmailVerification(auth.currentUser);
-                  Alert.alert("Odesláno", "Nový ověřovací email byl odeslán.");
-                }
-              } catch (e: any) {
-                Alert.alert(
-                  "Chyba",
-                  "Příliš brzy na další email. Zkuste to později.",
-                );
-              }
-            }}
-          >
-            <Text style={styles.buttonSecondaryText}>Poslat email znovu</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.buttonLogout} onPress={handleLogout}>
-            <Text style={styles.buttonLogoutText}>Odhlásit se</Text>
-          </TouchableOpacity>
-        </View>
-      );
-    }
-
-    // BARISTA MODE
-    if (userData?.role === "admin") {
-      // Kontrola povolení kamery
-      if (!permission) return <View />;
-      if (!permission.granted) {
-        return (
-          <View style={styles.container}>
-            <Text style={styles.subtitle}>Potřebujeme přístup ke kameře</Text>
-            <TouchableOpacity
-              onPress={requestPermission}
-              style={styles.buttonPrimary}
-            >
-              <Text style={styles.buttonPrimaryText}>Povolit kameru</Text>
-            </TouchableOpacity>
-          </View>
-        );
-      }
-
-      return (
-        <View style={styles.container}>
-          <Text style={styles.title}>Režim Barista 📸</Text>
-          <Text style={styles.subtitle}>Naskenuj QR kód zákazníka</Text>
-
-          {/* Kamera - Barista */}
-          <View style={styles.cameraContainer}>
-            <CameraView
-              style={StyleSheet.absoluteFillObject}
-              facing="back"
-              onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
-              barcodeScannerSettings={{
-                barcodeTypes: ["qr"],
-              }}
-            />
-          </View>
-
-          <TouchableOpacity style={styles.buttonLogout} onPress={handleLogout}>
-            <Text style={styles.buttonLogoutText}>Ukončit směnu</Text>
-          </TouchableOpacity>
-        </View>
-      );
-    }
-
-    // CUSTOMER MODE
-    return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Moje věrnostní karta</Text>
-
-        <LoyaltyCard
-          userId={user.uid}
-          points={userData?.points || 0}
-          lastPointAdded={lastPointAdded}
+        <VerificationScreen
+          email={user.email}
+          onCheckVerification={handleCheckVerification}
+          onResendEmail={handleResendEmail}
+          onLogout={handleLogout}
         />
+      );
+    }
 
-        <Text style={{ marginTop: 24, color: "#8B7355", fontStyle: "italic" }}>
-          Klikni na kartu pro zobrazení QR kódu
-        </Text>
+    // B) Barista (Admin)
+    if (userData?.role === "admin") {
+      return (
+        <BaristaScreen
+          permission={permission}
+          requestPermission={requestPermission}
+          scanned={scanned}
+          onBarCodeScanned={handleBarCodeScanned}
+          onLogout={handleLogout}
+        />
+      );
+    }
 
-        <TouchableOpacity style={styles.buttonLogout} onPress={handleLogout}>
-          <Text style={styles.buttonLogoutText}>
-            Odhlásit se ({user.email})
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.buttonDelete}
-          onPress={handleDeleteAccount}
-        >
-          <Text style={styles.buttonDeleteText}>Smazat účet</Text>
-        </TouchableOpacity>
-      </View>
+    // C) Zákazník
+    return (
+      <CustomerScreen
+        userId={user.uid}
+        email={user.email}
+        points={userData?.points || 0}
+        lastPointAdded={lastPointAdded}
+        onLogout={handleLogout}
+        onDeleteAccount={handleDeleteAccount}
+      />
     );
   }
 
-  // LOGIN SCREEN
+  // --- 2. POKUD NENÍ PŘIHLÁŠENÝ (LOGIN) ---
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Kavárna Doma ☕</Text>
-
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        placeholderTextColor="#Aca"
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize="none"
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Heslo"
-        placeholderTextColor="#Aca"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-      />
-
-      <TouchableOpacity style={styles.buttonPrimary} onPress={handleLogin}>
-        <Text style={styles.buttonPrimaryText}>Přihlásit se</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.buttonSecondary} onPress={handleRegister}>
-        <Text style={styles.buttonSecondaryText}>Založit účet</Text>
-      </TouchableOpacity>
-    </View>
+    <AuthScreen
+      email={email}
+      setEmail={setEmail}
+      password={password}
+      setPassword={setPassword}
+      onLogin={handleLogin}
+      onRegister={handleRegister}
+    />
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FAF6F3", // Krémové pozadí
+    backgroundColor: "#FAF6F3",
     alignItems: "center",
     justifyContent: "center",
-    padding: 24,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#4A3728", // Kávově hnědá
-    marginBottom: 32,
-    textAlign: "center",
-  },
-  subtitle: {
-    fontSize: 18,
-    color: "#8B7355",
-    marginBottom: 24,
-    textAlign: "center",
-  },
-  input: {
-    width: "100%",
-    height: 56,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    paddingHorizontal: 20,
-    fontSize: 16,
-    color: "#4A3728",
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: "#E8DDD4",
-    shadowColor: "#4A3728",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  buttonPrimary: {
-    width: "100%",
-    height: 56,
-    backgroundColor: "#4A3728",
-    borderRadius: 16,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 8,
-    marginBottom: 16,
-    shadowColor: "#4A3728",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  buttonPrimaryText: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  buttonSecondary: {
-    width: "100%",
-    height: 56,
-    backgroundColor: "transparent",
-    borderRadius: 16,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: "#E8DDD4",
-  },
-  buttonSecondaryText: {
-    color: "#8B7355",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  buttonLogout: {
-    marginTop: 30,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#FFCDD2",
-    backgroundColor: "#FFEBEE",
-  },
-  buttonLogoutText: {
-    color: "#C62828",
-    fontWeight: "600",
-    fontSize: 14,
-  },
-  buttonDelete: {
-    marginTop: 12,
-    padding: 8,
-  },
-  buttonDeleteText: {
-    color: "#9E9E9E",
-    fontSize: 12,
-    textDecorationLine: "underline",
-  },
-
-  // styly pro kameru
-  cameraContainer: {
-    width: 280,
-    height: 280,
-    overflow: "hidden",
-    borderRadius: 24,
-    backgroundColor: "#000",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 5,
-    borderColor: "#4A3728",
-    marginBottom: 20,
   },
 });

@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { Dimensions, StyleSheet, TouchableOpacity, View } from "react-native";
 import QRCode from "react-native-qrcode-svg";
+import * as Haptics from "expo-haptics";
 import Animated, {
+  ReduceMotion,
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withSequence,
@@ -22,7 +25,7 @@ const { width } = Dimensions.get("window");
 const CARD_WIDTH = Math.min(width * 0.9, 380);
 const CARD_HEIGHT = CARD_WIDTH * 0.65;
 
-// Ikona hrníčku s kávou - animovaná verze
+// --- Komponenta Hrníčku ---
 const AnimatedCoffeeCupIcon = ({
   filled,
   size = 40,
@@ -33,26 +36,19 @@ const AnimatedCoffeeCupIcon = ({
   shouldAnimate?: boolean;
 }) => {
   const scale = useSharedValue(1);
-  const pulse = useSharedValue(1);
 
   useEffect(() => {
     if (shouldAnimate) {
       scale.value = withSequence(
-        withSpring(1.5, { damping: 8, stiffness: 200 }),
-        withSpring(1, { damping: 10, stiffness: 100 }),
+        withSpring(1.5, { reduceMotion: ReduceMotion.Never }),
+        withSpring(1, { reduceMotion: ReduceMotion.Never })
       );
-
-      pulse.value = withSequence(
-        withTiming(1.2, { duration: 150 }),
-        withTiming(1, { duration: 150 }),
-        withTiming(1.2, { duration: 150 }),
-        withTiming(1, { duration: 150 }),
-      );
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
   }, [shouldAnimate]);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value * pulse.value }],
+    transform: [{ scale: scale.value }],
   }));
 
   return (
@@ -85,123 +81,102 @@ export function LoyaltyCard({
   onPointPress,
   lastPointAdded,
 }: LoyaltyCardProps) {
-  const rotation = useSharedValue(0);
-  const [isFlipped, setIsFlipped] = useState(false);
+  const [showQr, setShowQr] = useState(false);
   const [animatingIndex, setAnimatingIndex] = useState<number | null>(null);
+
+  const scale = useSharedValue(1);
+  const opacity = useSharedValue(1);
 
   useEffect(() => {
     if (lastPointAdded && points > 0) {
       const lastIndex = points - 1;
       setAnimatingIndex(lastIndex);
-
-      const timer = setTimeout(() => {
-        setAnimatingIndex(null);
-      }, 1500);
-
+      const timer = setTimeout(() => setAnimatingIndex(null), 1500);
       return () => clearTimeout(timer);
     }
   }, [lastPointAdded, points]);
 
-  const handleCardPress = () => {
-    rotation.value = withSpring(rotation.value + 180, {
-      damping: 15,
-      stiffness: 90,
-    });
-    setIsFlipped(!isFlipped);
+  const toggleState = () => {
+    setShowQr((prev) => !prev);
   };
 
-  const frontAnimatedStyle = useAnimatedStyle(() => {
-    const rad = rotation.value * (Math.PI / 180);
-    const zIndex = Math.cos(rad) > 0 ? 100 : 0;
-    const scale = 1 + 0.1 * Math.sin(rad);
+  const handleCardPress = () => {
+    Haptics.selectionAsync();
 
-    return {
-      transform: [
-        { perspective: 1000 },
-        { rotateY: `${rotation.value}deg` },
-        { scale },
-      ],
-      backfaceVisibility: "hidden",
-      zIndex,
-    };
-  });
+    // 1. Zmenšit a zprůhlednit (Fade Out) - RYCHLEJI (100ms)
+    scale.value = withTiming(0.92, { duration: 100, reduceMotion: ReduceMotion.Never });
+    opacity.value = withTiming(0, { duration: 100, reduceMotion: ReduceMotion.Never }, (finished) => {
+      if (finished) {
+        runOnJS(toggleState)();
+      }
+    });
+  };
 
-  const backAnimatedStyle = useAnimatedStyle(() => {
-    const rad = (rotation.value + 180) * (Math.PI / 180);
-    const zIndex = Math.cos(rad) > 0 ? 100 : 0;
-    const scale = 1 + 0.1 * Math.sin(rotation.value * (Math.PI / 180));
+  useEffect(() => {
+    // 2. Zpět nahoru (Fade In) - MENŠÍ DAMPING (rychlejší návrat)
+    scale.value = withSpring(1, { damping: 15, stiffness: 300, reduceMotion: ReduceMotion.Never });
+    opacity.value = withTiming(1, { duration: 150, reduceMotion: ReduceMotion.Never });
+  }, [showQr]);
 
-    return {
-      transform: [
-        { perspective: 1000 },
-        { rotateY: `${rotation.value + 180}deg` },
-        { scale },
-      ],
-      backfaceVisibility: "hidden",
-      zIndex,
-    };
-  });
+  const containerStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity: opacity.value,
+  }));
 
   return (
-    <TouchableOpacity onPress={handleCardPress} activeOpacity={0.9}>
-      <View style={styles.cardContainer}>
-        {/* Přední strana - jen hrníčky */}
-        <Animated.View
-          style={[styles.card, styles.cardFront, frontAnimatedStyle]}
-        >
-          <ThemedText style={styles.title}>Kavárna Doma</ThemedText>
-
-          <View style={styles.stampsContainer}>
-            <View style={styles.stampsRow}>
-              {[0, 1, 2, 3, 4].map((i) => (
-                <TouchableOpacity
-                  key={i}
-                  style={styles.stampSlot}
-                  onPress={() => onPointPress?.(i)}
-                  activeOpacity={0.7}
-                  disabled={!onPointPress}
-                >
-                  <AnimatedCoffeeCupIcon
-                    filled={i < points}
-                    size={42}
-                    shouldAnimate={animatingIndex === i}
-                  />
-                </TouchableOpacity>
-              ))}
-            </View>
-            <View style={styles.stampsRow}>
-              {[5, 6, 7, 8, 9].map((i) => (
-                <TouchableOpacity
-                  key={i}
-                  style={styles.stampSlot}
-                  onPress={() => onPointPress?.(i)}
-                  activeOpacity={0.7}
-                  disabled={!onPointPress}
-                >
-                  <AnimatedCoffeeCupIcon
-                    filled={i < points}
-                    size={42}
-                    shouldAnimate={animatingIndex === i}
-                  />
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <ThemedText style={styles.hint}>10. káva zdarma ☕</ThemedText>
-        </Animated.View>
-
-        {/* Zadní strana - jen QR kód */}
-        <Animated.View
-          style={[styles.card, styles.cardBack, backAnimatedStyle]}
-        >
-          <ThemedText style={styles.backTitle}>Můj QR kód</ThemedText>
-
-          <View style={styles.qrContainer}>
-            <QRCode value={userId} size={110} />
-          </View>
-
-          <ThemedText style={styles.backHint}>Ukaž obsluze</ThemedText>
+    <TouchableOpacity onPress={handleCardPress} activeOpacity={1}>
+      <View style={styles.cardWrapper}>
+        <Animated.View style={[styles.card, containerStyle]}>
+          {!showQr ? (
+            <>
+              <ThemedText style={styles.title}>Kavárna Doma</ThemedText>
+              <View style={styles.stampsContainer}>
+                <View style={styles.stampsRow}>
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <TouchableOpacity
+                      key={i}
+                      style={styles.stampSlot}
+                      onPress={() => onPointPress?.(i)}
+                      activeOpacity={0.7}
+                      disabled={!onPointPress}
+                    >
+                      <AnimatedCoffeeCupIcon
+                        filled={i < points}
+                        size={42}
+                        shouldAnimate={animatingIndex === i}
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <View style={styles.stampsRow}>
+                  {[5, 6, 7, 8, 9].map((i) => (
+                    <TouchableOpacity
+                      key={i}
+                      style={styles.stampSlot}
+                      onPress={() => onPointPress?.(i)}
+                      activeOpacity={0.7}
+                      disabled={!onPointPress}
+                    >
+                      <AnimatedCoffeeCupIcon
+                        filled={i < points}
+                        size={42}
+                        shouldAnimate={animatingIndex === i}
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+              <ThemedText style={styles.hint}>10. káva zdarma ☕</ThemedText>
+            </>
+          ) : (
+            <>
+              <ThemedText style={styles.backTitle}>Můj QR kód</ThemedText>
+              <View style={styles.qrContainer}>
+                <QRCode value={userId} size={110} />
+              </View>
+              <ThemedText style={styles.backHint}>Ukaž obsluze</ThemedText>
+            </>
+          )}
         </Animated.View>
       </View>
     </TouchableOpacity>
@@ -209,76 +184,70 @@ export function LoyaltyCard({
 }
 
 const styles = StyleSheet.create({
-  cardContainer: {
+  cardWrapper: {
     width: CARD_WIDTH,
     height: CARD_HEIGHT,
     alignSelf: "center",
+    shadowColor: "#4A3728",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
   },
   card: {
-    position: "absolute",
     width: "100%",
     height: "100%",
-    borderRadius: 20,
-    padding: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 8,
+    backgroundColor: "#FDF8F3",
+    borderRadius: 24,
+    padding: 20,
     justifyContent: "space-between",
     alignItems: "center",
-  },
-  cardFront: {
-    backgroundColor: "#FDF8F3",
-  },
-  cardBack: {
-    backgroundColor: "#FDF8F3",
+    borderWidth: 1,
+    borderColor: "#E8DDD4",
   },
   title: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: "bold",
     fontStyle: "italic",
     color: "#4A3728",
-    textAlign: "center",
   },
   stampsContainer: {
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 8,
+    gap: 10,
   },
   stampsRow: {
     flexDirection: "row",
     gap: 10,
   },
   stampSlot: {
-    width: 52,
-    height: 52,
+    width: 50,
+    height: 50,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#FFFFFF",
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 2,
-    borderColor: "#E8DDD4",
+    borderColor: "#F0E6DD",
   },
   hint: {
     fontSize: 14,
     color: "#8B7355",
-    textAlign: "center",
+    fontWeight: "500",
   },
   backTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: "bold",
     color: "#4A3728",
-    textAlign: "center",
   },
   qrContainer: {
-    backgroundColor: "#FFFFFF",
-    padding: 16,
+    backgroundColor: "#FFF",
+    padding: 12,
     borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#E8DDD4",
   },
   backHint: {
-    fontSize: 14,
+    fontSize: 16,
     color: "#8B7355",
-    textAlign: "center",
+    marginBottom: 4,
   },
 });
