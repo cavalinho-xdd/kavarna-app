@@ -19,6 +19,7 @@ interface LoyaltyCardProps {
   points: number;
   onPointPress?: (index: number) => void;
   lastPointAdded?: number;
+  onQrToggle?: (showQr: boolean) => void;
 }
 
 const { width } = Dimensions.get("window");
@@ -80,6 +81,7 @@ export function LoyaltyCard({
   points,
   onPointPress,
   lastPointAdded,
+  onQrToggle,
 }: LoyaltyCardProps) {
   const [showQr, setShowQr] = useState(false);
   const [animatingIndex, setAnimatingIndex] = useState<number | null>(null);
@@ -97,7 +99,11 @@ export function LoyaltyCard({
   }, [lastPointAdded, points]);
 
   const toggleState = () => {
-    setShowQr((prev) => !prev);
+    setShowQr((prev) => {
+      const newState = !prev;
+      onQrToggle?.(newState);
+      return newState;
+    });
   };
 
   const handleCardPress = () => {

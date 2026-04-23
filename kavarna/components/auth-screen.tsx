@@ -31,7 +31,7 @@ export function AuthScreen({
       <TextInput
         style={styles.input}
         placeholder="Email"
-        placeholderTextColor="#Aca"
+        placeholderTextColor="#9E9E9E"
         value={email}
         onChangeText={setEmail}
         autoCapitalize="none"
@@ -39,7 +39,7 @@ export function AuthScreen({
       <TextInput
         style={styles.input}
         placeholder="Heslo"
-        placeholderTextColor="#Aca"
+        placeholderTextColor="#9E9E9E"
         value={password}
         onChangeText={setPassword}
         secureTextEntry

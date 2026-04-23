@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { LoyaltyCard } from "./loyalty-card";
 import { LinearGradient } from "expo-linear-gradient";
@@ -20,6 +20,8 @@ export function CustomerScreen({
   onLogout,
   onDeleteAccount,
 }: CustomerScreenProps) {
+  const [isShowingQr, setIsShowingQr] = useState(false);
+
   return (
     <LinearGradient
       colors={["#FDFbf8", "#F2E6D8"]}
@@ -33,9 +35,14 @@ export function CustomerScreen({
         userId={userId}
         points={points}
         lastPointAdded={lastPointAdded}
+        onQrToggle={setIsShowingQr}
       />
 
-      <Text style={styles.hintText}>Klikni na kartu pro zobrazení QR kódu</Text>
+      <Text style={styles.hintText}>
+        {isShowingQr
+          ? "Kliknutím na QR kód zobrazíte věrnostní kartu"
+          : "Kliknutím na kartu zobrazíte svůj QR kód"}
+      </Text>
 
       <TouchableOpacity style={styles.buttonLogout} onPress={onLogout}>
         <Text style={styles.buttonLogoutText}>Odhlásit se ({email})</Text>
@@ -51,7 +58,7 @@ export function CustomerScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    // backgroundColor: "#FAF6F3", // Nahrazeno gradientem
+  // Nahrazeno gradientem
     alignItems: "center",
     justifyContent: "center",
     padding: 24,
